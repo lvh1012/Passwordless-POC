@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: passkey-authn
+    runtime: docker
+    plan: free
+    rootDir: pocs/PasskeyAuthn
+    # Render resolves Docker paths and the build context from this service root.
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # Task 7 triggers deployment through a Deploy Hook after CI succeeds.
+    autoDeployTrigger: off
+    envVars:
+      # Render supplies these values; credentials stay outside the repository.
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Passkey__ServerDomain
+        sync: false
+      - key: Passkey__ExpectedOrigin
+        sync: false

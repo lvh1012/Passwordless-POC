@@ -1,0 +1,16 @@
+@page "/register"
+@{
+    ViewData["Title"] = "Register";
+}
+
+<section class="auth-card" aria-labelledby="registration-heading">
+    <h1 id="registration-heading">Create a passkey</h1>
+    <p>Register a passkey for your email address.</p>
+    <form id="registration-form" data-passkey-form data-passkey-action="registration">
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="registration-status registration-error" />
+        <button type="submit">Create passkey</button>
+        <p id="registration-status" class="status" data-passkey-status role="status" aria-live="polite" hidden></p>
+        <p id="registration-error" class="error" data-passkey-error role="alert" hidden></p>
+    </form>
+</section>

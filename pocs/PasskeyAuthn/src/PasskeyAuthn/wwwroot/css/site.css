@@ -1,0 +1,39 @@
+:root {
+    color-scheme: light;
+    font-family: system-ui, sans-serif;
+    color: #172033;
+    background: #f6f8fb;
+}
+
+body { margin: 0; }
+
+.site-header {
+    padding: 1rem 1.5rem;
+    background: #172033;
+}
+
+nav { display: flex; gap: 1rem; }
+nav a { color: #fff; }
+
+.page-content {
+    display: grid;
+    min-height: calc(100vh - 54px);
+    place-items: center;
+    padding: 1.5rem;
+}
+
+.auth-card, .dashboard {
+    width: min(100%, 28rem);
+    padding: 2rem;
+    background: #fff;
+    border-radius: .75rem;
+    box-shadow: 0 8px 24px rgb(23 32 51 / 12%);
+}
+
+form { display: grid; gap: .75rem; }
+input, button { font: inherit; padding: .7rem; }
+button { cursor: pointer; background: #155eef; color: #fff; border: 0; border-radius: .35rem; }
+button:disabled { cursor: wait; opacity: .65; }
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.status { color: #0f766e; }
+.error { color: #b42318; }

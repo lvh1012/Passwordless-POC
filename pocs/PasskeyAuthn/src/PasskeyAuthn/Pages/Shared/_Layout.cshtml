@@ -1,0 +1,32 @@
+@using Microsoft.AspNetCore.Antiforgery
+@inject IAntiforgery Antiforgery
+@{
+    // The request token is exposed only for same-origin POSTs; authentication cookies remain HttpOnly.
+    var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="@csrfToken" />
+    <title>@ViewData["Title"] - Passkey POC</title>
+    <link rel="stylesheet" href="/css/site.css" />
+    <script src="/js/passkey.js" defer></script>
+</head>
+<body>
+    <header class="site-header">
+        <nav aria-label="Primary navigation">
+            <a href="/">Sign in</a>
+            <a href="/register">Register</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a href="/dashboard">Dashboard</a>
+            }
+        </nav>
+    </header>
+    <main class="page-content">
+        @RenderBody()
+    </main>
+</body>
+</html>

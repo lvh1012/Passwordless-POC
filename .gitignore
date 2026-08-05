@@ -1,0 +1,23 @@
+# Build output is generated per project and should not be committed.
+**/bin/
+**/obj/
+
+# Visual Studio and JetBrains local workspace files.
+.vs/
+*.user
+*.suo
+.idea/
+
+# Test and coverage artifacts.
+TestResults/
+coverage/
+
+# Local environment and secret configuration.
+*.userprefs
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Local logs and OS metadata.
+*.log
+.DS_Store
+Thumbs.db

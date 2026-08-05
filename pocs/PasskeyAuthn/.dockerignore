@@ -1,0 +1,30 @@
+.git
+.gitignore
+.idea
+.vs
+
+# The context is already scoped to this POC; exclude its test tree so unrelated test tooling cannot enter the image.
+tests/
+
+# .NET build outputs are generated locally and are never inputs to the publish step.
+**/bin
+**/obj
+**/TestResults
+**/*.trx
+**/*.coverage
+
+# Keep credentials, private keys, and machine-specific configuration out of the POC build context.
+**/.env
+**/.env.*
+**/appsettings.Local.json
+**/appsettings.*.local.json
+**/*.pfx
+**/*.pem
+**/*.key
+
+# SDD notes are planning scratch space and are not needed to publish this POC.
+.superpowers
+docs/superpowers
+
+# This extra pattern protects against a test project being placed outside tests/ during future layout changes.
+**/PasskeyAuthn.Tests

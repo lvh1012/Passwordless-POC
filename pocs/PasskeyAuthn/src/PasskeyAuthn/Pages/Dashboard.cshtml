@@ -1,0 +1,17 @@
+@page "/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@{
+    // Authorization is enforced by endpoint metadata before this page can render user data.
+    ViewData["Title"] = "Dashboard";
+    var email = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name ?? "Unknown user";
+}
+
+<section class="dashboard" aria-labelledby="dashboard-heading">
+    <h1 id="dashboard-heading">Dashboard</h1>
+    <p>Signed in as <strong id="authenticated-email">@email</strong>.</p>
+    <button id="logout-button" type="button">Sign out</button>
+    <p id="logout-status" class="status" role="status" aria-live="polite" hidden></p>
+    <p id="logout-error" class="error" role="alert" hidden></p>
+</section>

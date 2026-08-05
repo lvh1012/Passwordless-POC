@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'scripts/**'
+      - 'pocs/**'
+      - 'PasswordlessAuthn.slnx'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'scripts/**'
+      - 'pocs/**'
+      - 'PasswordlessAuthn.slnx'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Validate discovery contract
+        run: node scripts/discover-pocs.test.mjs
+      - name: Discover POC matrix
+        id: matrix
+        shell: bash
+        run: echo "matrix=$(node scripts/discover-pocs.mjs)" >> "$GITHUB_OUTPUT"
+
+  solution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore aggregate solution
+        run: dotnet restore PasswordlessAuthn.slnx
+      - name: Build aggregate solution
+        run: dotnet build PasswordlessAuthn.slnx --configuration Release --no-restore
+
+  poc-validation:
+    needs: [discover]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      # Each POC owns its build, test, and Docker-context validation contract.
+      - name: Validate POC
+        run: bash "${{ matrix.path }}/${{ matrix.ciScript }}"
+
+  deploy:
+    needs: [discover, solution, poc-validation]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.poc-validation.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Trigger POC Render Deploy Hook
+        if: matrix.deployHookSecret != ''
+        env:
+          # Dynamic lookup isolates each POC's hook secret; the URL is never logged.
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets[matrix.deployHookSecret] }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK_URL"
+          curl --fail-with-body --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"

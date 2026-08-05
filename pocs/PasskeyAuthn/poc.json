@@ -1,0 +1,4 @@
+{
+  "id": "passkey-authn",
+  "deployHookSecret": "RENDER_DEPLOY_HOOK_URL_PASSKEY_AUTHN"
+}
