@@ -57,7 +57,8 @@ builder.Services.Configure<IdentityPasskeyOptions>(options =>
 {
     options.ServerDomain = passkeySettings.ServerDomain;
     options.UserVerificationRequirement = "required";
-    options.ResidentKeyRequirement = "preferred";
+    // Username-less login requires every newly registered credential to be discoverable.
+    options.ResidentKeyRequirement = "required";
     options.AuthenticatorTimeout = TimeSpan.FromSeconds(passkeySettings.AuthenticatorTimeoutSeconds);
     options.ValidateOrigin = context =>
         ValueTask.FromResult(

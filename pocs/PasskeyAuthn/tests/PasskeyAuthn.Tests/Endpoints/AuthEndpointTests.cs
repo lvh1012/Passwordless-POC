@@ -53,4 +53,18 @@ public sealed class AuthEndpointTests : IDisposable
             value.Contains(".AspNetCore.Identity.Application=", StringComparison.Ordinal) &&
             value.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    /// <summary>
+    /// Verifies an authenticated logout request cannot change session state without antiforgery proof.
+    /// </summary>
+    public async Task Logout_requires_antiforgery_for_authenticated_callers()
+    {
+        using var client = await AntiforgeryHttpClient.CreateAsync(_factory, authenticated: true);
+        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+
+        using var response = await client.PostAsync("/api/auth/logout", content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

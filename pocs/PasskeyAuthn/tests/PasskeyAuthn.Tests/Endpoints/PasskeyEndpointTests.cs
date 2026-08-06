@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,17 +66,32 @@ public sealed class PasskeyEndpointTests : IDisposable
 
     [Fact]
     /// <summary>
-    /// Verifies a missing option body is converted to the stable invalid-email contract.
+    /// Verifies login options are generated without an email or a user-specific credential allow list.
     /// </summary>
-    public async Task Login_options_with_empty_body_returns_safe_invalid_email()
+    public async Task Login_options_without_email_returns_discoverable_request_options()
     {
         using var client = await AntiforgeryHttpClient.CreateAsync(_factory);
 
         using var response = await client.PostAsync("/api/passkeys/login/options", content: null);
-        var error = await response.Content.ReadFromJsonAsync<ApiError>();
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal(new ApiError("invalid_email", "A valid email address is required."), error);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(root.TryGetProperty("challenge", out var challenge));
+        Assert.False(string.IsNullOrWhiteSpace(challenge.GetString()));
+        Assert.Equal("required", root.GetProperty("userVerification").GetString());
+
+        if (root.TryGetProperty("allowCredentials", out var allowCredentials))
+        {
+            Assert.True(
+                allowCredentials.ValueKind == JsonValueKind.Null ||
+                (allowCredentials.ValueKind == JsonValueKind.Array && allowCredentials.GetArrayLength() == 0));
+        }
+
+        Assert.Contains(
+            response.Headers.GetValues("Set-Cookie"),
+            cookie => cookie.Contains("TwoFactorUserId", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -110,20 +126,24 @@ public sealed class PasskeyEndpointTests : IDisposable
 
     [Fact]
     /// <summary>
-    /// Verifies unknown accounts receive only the generic authentication failure contract.
+    /// Verifies registration options require credentials that can support username-less login.
     /// </summary>
-    public async Task Login_options_with_unknown_email_does_not_reveal_account_existence()
+    public async Task Registration_options_require_discoverable_passkey()
     {
-        const string email = "missing@example.test";
+        var email = $"discoverable-{Guid.NewGuid():N}@example.test";
         using var client = await AntiforgeryHttpClient.CreateAsync(_factory);
 
-        using var response = await client.PostAsJsonAsync("/api/passkeys/login/options", new { Email = email });
-        var body = await response.Content.ReadAsStringAsync();
-        var error = await response.Content.ReadFromJsonAsync<ApiError>();
+        using var response = await client.PostAsJsonAsync("/api/passkeys/register/options", new { Email = email });
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal(new ApiError("authentication_failed", "Authentication failed."), error);
-        Assert.DoesNotContain(email, body, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "required",
+            document.RootElement
+                .GetProperty("authenticatorSelection")
+                .GetProperty("residentKey")
+                .GetString());
     }
 
     [Fact]
@@ -290,6 +310,21 @@ public sealed class PasskeyEndpointTests : IDisposable
         using var response = await client.PostAsJsonAsync(
             "/api/passkeys/register/options",
             new { Email = "person@example.test" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    /// <summary>
+    /// Verifies username-less login options still require antiforgery proof.
+    /// </summary>
+    public async Task Username_less_login_options_without_antiforgery_is_rejected()
+    {
+        using var client = _factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            "/api/passkeys/login/options",
+            content: null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

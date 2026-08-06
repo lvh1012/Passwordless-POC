@@ -99,3 +99,11 @@ test("assertion serialization includes required binary fields and omits a null u
         },
     });
 });
+
+test("maps login verification failures to a safe message", () => {
+    const client = loadPasskeyClient();
+
+    assert.equal(
+        client.mapError({ name: "AuthenticationFailed" }),
+        "The passkey could not be verified. Please try again.");
+});

@@ -106,12 +106,13 @@ automated HTTP client cannot prove the WebAuthn cryptographic ceremony.
 2. Confirm the browser redirects to `/dashboard` and displays the expected
    email address.
 3. Log out from `/dashboard`.
-4. Open `/`, enter the same email address, and sign in with the same Passkey.
+4. Open `/` and sign in with the same discoverable Passkey; no email input is
+   required.
 5. In a new anonymous browser session, open `/dashboard` and confirm it
    redirects to `/`.
 6. Confirm safe user-facing behavior for a cancelled authenticator, unsupported
-   WebAuthn, duplicate registration, an unknown email, a malformed credential,
-   and an expired challenge.
+   WebAuthn, duplicate registration, a malformed credential, and an expired
+   challenge.
 7. In Supabase PostgreSQL, confirm that `AspNetUserPasskeys` contains a row whose
    `UserId` joins to the registered row in `AspNetUsers`. Inspect only the row
    relationship and public credential metadata; never expose credential blobs
@@ -138,10 +139,12 @@ evidence that the deployed flow has passed.
 - Supabase project availability, quotas, connection limits, and other Free-plan
   limitations apply; they are outside this application's control.
 - This POC does not implement account recovery or email verification.
-- The email-first flow deliberately returns different statuses/options for
-  unknown login and duplicate registration. Generic messages avoid exposing
-  Passkey details, but eligibility can still be inferred through status,
-  options, or timing; this is not a production anti-enumeration design.
+- Login is strict username-less and resolves the user from the discoverable
+  credential ID returned by the authenticator. Registration remains email-based
+  because it creates the initial Identity account.
+- Passkeys created before `residentKey = required` may not be discoverable and
+  must be re-registered. The POC does not automatically delete or migrate those
+  credentials.
 - The POC has no password fallback, Passkey management UI, production SLA,
   monitoring, backups, multi-instance scaling, or high-volume rate limiting.
 - It is not a production authentication service; production use would require

@@ -5,10 +5,8 @@
 
 <section class="auth-card" aria-labelledby="login-heading">
     <h1 id="login-heading">Sign in</h1>
-    <p>Use the passkey registered for your email address.</p>
+    <p>Use a discoverable passkey registered for this site.</p>
     <form id="login-form" data-passkey-form data-passkey-action="login">
-        <label for="email">Email address</label>
-        <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="login-status login-error" />
         <button type="submit">Sign in with passkey</button>
         <p id="login-status" class="status" data-passkey-status role="status" aria-live="polite" hidden></p>
         <p id="login-error" class="error" data-passkey-error role="alert" hidden></p>

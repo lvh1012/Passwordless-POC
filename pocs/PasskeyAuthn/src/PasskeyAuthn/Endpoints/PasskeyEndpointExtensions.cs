@@ -39,7 +39,8 @@ public static class PasskeyEndpointExtensions
 
         var passkeys = endpoints.MapGroup("/api/passkeys")
             .WithMetadata(new RequireAntiforgeryTokenAttribute(required: true))
-            .RequireRateLimiting(RateLimitPolicy);
+            .RequireRateLimiting(RateLimitPolicy)
+            .ValidateAntiforgery();
 
         passkeys.MapPost("/register/options", CreateRegistrationOptionsAsync);
         passkeys.MapPost("/register/complete", CompleteRegistrationAsync);
@@ -173,26 +174,10 @@ public static class PasskeyEndpointExtensions
     }
 
     private static async Task<IResult> CreateLoginOptionsAsync(
-        HttpRequest httpRequest,
-        UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
-        IOptions<PasskeySettings> settingsOptions)
+        SignInManager<ApplicationUser> signInManager)
     {
-        var request = await ReadRequestAsync<EmailRequest>(httpRequest);
-        var email = NormalizeAndValidateEmail(request?.Email, settingsOptions.Value.MaxDisplayNameLength);
-        if (email is null)
-        {
-            return Error(StatusCodes.Status400BadRequest, InvalidEmail);
-        }
-
-        var normalizedEmail = userManager.NormalizeEmail(email);
-        var user = await userManager.Users.SingleOrDefaultAsync(candidate => candidate.NormalizedEmail == normalizedEmail);
-        if (user is null || (await userManager.GetPasskeysAsync(user)).Count == 0)
-        {
-            return Error(StatusCodes.Status401Unauthorized, AuthenticationFailed);
-        }
-
-        var optionsJson = await signInManager.MakePasskeyRequestOptionsAsync(user);
+        // A null user intentionally creates a discoverable, username-less assertion request.
+        var optionsJson = await signInManager.MakePasskeyRequestOptionsAsync(user: null);
         return Results.Content(optionsJson, "application/json");
     }
 

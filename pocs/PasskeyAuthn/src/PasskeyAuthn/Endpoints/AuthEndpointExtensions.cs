@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using PasskeyAuthn.Data;
+using PasskeyAuthn.Security;
 
 namespace PasskeyAuthn.Endpoints;
 
@@ -24,7 +25,8 @@ public static class AuthEndpointExtensions
                 return Results.NoContent();
             })
             .RequireAuthorization()
-            .WithMetadata(new RequireAntiforgeryTokenAttribute(required: true));
+            .WithMetadata(new RequireAntiforgeryTokenAttribute(required: true))
+            .ValidateAntiforgery();
 
         return endpoints;
     }

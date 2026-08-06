@@ -28,17 +28,18 @@ public sealed class PageSmokeTests : IDisposable
 
     [Fact]
     /// <summary>
-    /// Verifies the login page exposes the email input and Passkey login action.
+    /// Verifies the login page exposes a username-less Passkey action without an email field.
     /// </summary>
-    public async Task Login_page_contains_email_field_and_login_action()
+    public async Task Login_page_contains_username_less_passkey_action()
     {
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync("/");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("id=\"email\"", body, StringComparison.Ordinal);
         Assert.Contains("Sign in with passkey", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"email\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"email\"", body, StringComparison.Ordinal);
     }
 
     [Fact]

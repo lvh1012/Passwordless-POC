@@ -135,6 +135,7 @@
             case "InvalidStateError": return "This passkey is already registered on this device.";
             case "NotSupportedError": return "This browser does not support passkeys.";
             case "ChallengeError": return "The passkey challenge is no longer valid. Please try again.";
+            case "AuthenticationFailed": return "The passkey could not be verified. Please try again.";
             case "ValidationError": return "Enter a valid email address.";
             case "MalformedResponse": return "The server returned an invalid response. Please try again.";
             default: return "The request could not be completed. Please try again.";
@@ -158,23 +159,43 @@
             body: JSON.stringify(body),
         });
         if (!response.ok) {
-            throw new CeremonyError(response.status === 400 && url.endsWith("/complete") ? "ChallengeError" : "ServerError");
+            const isLoginCompletion = url === "/api/passkeys/login/complete";
+            const isAuthenticationFailure =
+                isLoginCompletion && (response.status === 400 || response.status === 401);
+            const isRegistrationChallengeFailure =
+                url === "/api/passkeys/register/complete" && response.status === 400;
+
+            // Keep registration challenge UX stable while hiding all login verification details.
+            const errorName = isAuthenticationFailure
+                ? "AuthenticationFailed"
+                : isRegistrationChallengeFailure
+                    ? "ChallengeError"
+                    : "ServerError";
+            throw new CeremonyError(errorName);
         }
 
         return response;
     }
 
-    async function readOptions(url, email) {
-        if (!email?.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
-            throw new CeremonyError("ValidationError");
-        }
-
-        const response = await postJson(url, { email });
+    async function readOptionsResponse(url, body) {
+        const response = await postJson(url, body);
         try {
             return await response.json();
         } catch {
             throw new CeremonyError("MalformedResponse");
         }
+    }
+
+    async function readRegistrationOptions(email) {
+        if (!email?.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+            throw new CeremonyError("ValidationError");
+        }
+
+        return readOptionsResponse("/api/passkeys/register/options", { email });
+    }
+
+    async function readLoginOptions() {
+        return readOptionsResponse("/api/passkeys/login/options", {});
     }
 
     function formFor(action) {
@@ -201,9 +222,9 @@
             setMessage(form, "[data-passkey-error]", "");
             setMessage(form, "[data-passkey-status]", "Waiting for your passkey...");
             const isRegistration = action === "registration";
-            const options = await readOptions(
-                isRegistration ? "/api/passkeys/register/options" : "/api/passkeys/login/options",
-                email);
+            const options = isRegistration
+                ? await readRegistrationOptions(email)
+                : await readLoginOptions();
             const credential = isRegistration
                 ? await navigator.credentials.create({ publicKey: parseCreationOptions(options) })
                 : await navigator.credentials.get({ publicKey: parseRequestOptions(options) });
@@ -224,12 +245,11 @@
     }
 
     /**
-     * Starts the Passkey login ceremony for the supplied email address.
-     * @param {string} email The account email address.
+     * Starts the username-less Passkey login ceremony.
      * @returns {Promise<void>} A promise that resolves after UI state has been updated.
      */
-    async function startLogin(email) {
-        await runCeremony("login", email);
+    async function startLogin() {
+        await runCeremony("login");
     }
 
     /**
@@ -272,11 +292,10 @@
         document.querySelectorAll("[data-passkey-form]").forEach(form => {
             form.addEventListener("submit", event => {
                 event.preventDefault();
-                const email = form.elements.email.value;
                 if (form.dataset.passkeyAction === "registration") {
-                    void startRegistration(email);
+                    void startRegistration(form.elements.email?.value);
                 } else {
-                    void startLogin(email);
+                    void startLogin();
                 }
             });
         });

@@ -45,10 +45,12 @@ pocs/PasskeyAuthn/
 
 ### Login
 
-1. Mở `/` và nhập email address.
-2. Browser gọi `navigator.credentials.get()`.
-3. Server xác thực assertion và tạo authentication cookie.
-4. User được chuyển tới `/dashboard`.
+1. Mở `/` và bấm `Sign in with passkey`.
+2. Browser gọi `navigator.credentials.get()` để chọn discoverable Passkey.
+3. User hoàn tất user verification bằng platform authenticator.
+4. Server xác thực assertion bằng credential ID và public key đã lưu.
+5. ASP.NET Core Identity tạo authentication cookie.
+6. User được chuyển tới `/dashboard`.
 
 Các API ceremony chính:
 
@@ -56,10 +58,20 @@ Các API ceremony chính:
 | --- | --- | --- |
 | `POST` | `/api/passkeys/register/options` | Tạo registration options |
 | `POST` | `/api/passkeys/register/complete` | Hoàn tất registration |
-| `POST` | `/api/passkeys/login/options` | Tạo authentication options |
+| `POST` | `/api/passkeys/login/options` | Tạo username-less authentication options; body rỗng hoặc `{}` |
 | `POST` | `/api/passkeys/login/complete` | Hoàn tất login |
 | `POST` | `/api/auth/logout` | Xóa authentication cookie |
 | `GET` | `/health` | Kiểm tra database readiness |
+
+### State ownership
+
+- Registration dùng `RegistrationStateProtector` để bảo vệ `user ID` và thời hạn
+  của registration ceremony.
+- Login không nhận email, không lookup user trước assertion và không dùng
+  `RegistrationStateProtector`. `SignInManager` tạo, lưu và consume assertion
+  state qua built-in temporary Identity authentication state cookie.
+- Khi login complete, credential ID được dùng để resolve user; assertion được
+  verify bằng public key đã lưu trước khi application cookie được tạo.
 
 ## Chạy local
 
@@ -89,6 +101,11 @@ dotnet run --project pocs/PasskeyAuthn/src/PasskeyAuthn/PasskeyAuthn.csproj
 Ứng dụng tự apply EF Core migrations khi khởi động. Mở
 `http://localhost:8080/register` để tạo Passkey đầu tiên.
 
+Login là strict username-less. Registration bắt buộc tạo discoverable Passkey
+(`residentKey = required`), vì vậy Passkey được đăng ký trước thay đổi này có thể
+không tương thích. Khi dùng database cũ, cần xóa/re-register các Passkey cũ theo
+quy trình được operator phê duyệt; ứng dụng không tự động reset dữ liệu.
+
 Không đưa password hoặc connection string thật vào source control. Khi chạy
 production, PostgreSQL phải dùng TLS và `Passkey__ExpectedOrigin` phải khớp
 chính xác với HTTPS origin.
@@ -108,7 +125,7 @@ node --test pocs/PasskeyAuthn/tests/PasskeyAuthn.Tests/Browser/passkey-client-co
 
 Integration tests sử dụng Testcontainers PostgreSQL, vì vậy cần Docker daemon
 đang chạy. Browser contract test chỉ kiểm tra WebAuthn JSON serialization và
-không thay thế việc acceptance test bằng browser thật.
+client error contract; nó không thay thế acceptance test bằng browser thật.
 
 ## CI/CD
 
@@ -171,7 +188,7 @@ POC này được thiết kế cho Render Free Web Service và Supabase PostgreS
 ## Security notes
 
 - Authentication cookie là `HttpOnly`, `Secure` và `SameSite=Lax`.
-- State-changing POST endpoints yêu cầu antiforgery header.
+- JSON state-changing POST endpoints validate antiforgery header bằng endpoint filter.
 - Public Passkey endpoints có fixed-window rate limit.
 - Production startup từ chối localhost/mismatched origin và PostgreSQL không bật
   TLS.
