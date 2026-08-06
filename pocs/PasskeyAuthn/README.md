@@ -69,9 +69,10 @@ Các API ceremony chính:
 - PostgreSQL đang chạy và database connection có thể truy cập
 - Browser hỗ trợ WebAuthn
 
-Ứng dụng chạy trên `http://localhost:8080` theo mặc định. `localhost` được
-browser xem là secure context cho WebAuthn khi chạy local; khi deploy phải dùng
-HTTPS thật.
+Ứng dụng đọc port từ `ASPNETCORE_HTTP_PORTS`; Docker image cung cấp giá trị mặc
+định `8080`, có thể override bằng environment variable khi chạy container.
+`localhost` được browser xem là secure context cho WebAuthn khi chạy local; khi
+deploy phải dùng HTTPS thật.
 
 Đặt connection string và origin cho đúng địa chỉ local rồi chạy từ repository
 root:
@@ -80,6 +81,7 @@ root:
 $env:ConnectionStrings__Default = "Host=localhost;Port=5432;Database=passkeyauthn;Username=postgres;Password=<local-password>;SSL Mode=Prefer"
 $env:Passkey__ServerDomain = "localhost"
 $env:Passkey__ExpectedOrigin = "http://localhost:8080"
+$env:ASPNETCORE_HTTP_PORTS = "8080"
 
 dotnet run --project pocs/PasskeyAuthn/src/PasskeyAuthn/PasskeyAuthn.csproj
 ```
@@ -153,6 +155,7 @@ trong [docs/deployment.md](docs/deployment.md).
 | `Passkey__AuthenticatorTimeoutSeconds` | Thời gian authenticator timeout |
 | `Passkey__MaxPasskeysPerUser` | Tối đa 3 Passkeys mỗi user |
 | `Passkey__MaxDisplayNameLength` | Tối đa 100 ký tự |
+| `ASPNETCORE_HTTP_PORTS` | Port HTTP mà ASP.NET Core lắng nghe; Docker image mặc định `8080` |
 
 ## Deploy
 

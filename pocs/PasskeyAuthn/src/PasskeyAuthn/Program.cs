@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PasskeyAuthn.Configuration;
 using PasskeyAuthn.Data;
 using PasskeyAuthn.Endpoints;
@@ -12,9 +12,9 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
-
 builder.Services.AddRazorPages();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -27,8 +27,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 var passkeySettings = builder.Configuration
     .GetSection(PasskeySettings.SectionName)
     .Get<PasskeySettings>() ?? new PasskeySettings();
-builder.Services.AddOptions<PasskeySettings>()
+var passkeyOptions = builder.Services.AddOptions<PasskeySettings>()
     .Bind(builder.Configuration.GetSection(PasskeySettings.SectionName));
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+{
+    // Deployed hosts must validate configuration before database initialization; local and integration hosts keep their localhost/test defaults usable.
+    builder.Services.AddSingleton<IValidateOptions<PasskeySettings>, ProductionConfigurationValidator>();
+    passkeyOptions.ValidateOnStart();
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
@@ -90,14 +96,11 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-if (!EF.IsDesignTime && !app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
-{
-    // Production must reject localhost/WebAuthn mismatches and non-TLS PostgreSQL before any migration is attempted.
-    ProductionConfigurationValidator.Validate(passkeySettings, app.Configuration.GetConnectionString("Default"));
-}
-
 if (!EF.IsDesignTime)
 {
+    // Resolve validated options before migrations because WebApplication starts hosted startup validators only at Run().
+    _ = app.Services.GetRequiredService<IOptions<PasskeySettings>>().Value;
+
     // EF tooling builds the host to discover the model; it must not contact PostgreSQL while generating migrations.
     await using var scope = app.Services.CreateAsyncScope();
     await DatabaseInitializer.InitializeAsync(scope.ServiceProvider, app.Lifetime.ApplicationStopping);
@@ -119,7 +122,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapHealthEndpoints();
+app.MapHealthChecks("/health");
 app.MapPasskeyEndpoints();
 app.MapAuthEndpoints();
 app.MapRazorPages();

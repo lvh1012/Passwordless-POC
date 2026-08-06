@@ -51,8 +51,9 @@ provided with `sync: false`:
 
 Set all three in the Render service's **Environment** settings. Render's TLS
 termination and HTTP-to-HTTPS behavior provide the deployed HTTPS origin; the
-application consumes the forwarded HTTPS scheme. The container also listens on
-Render's `PORT` environment variable. Production startup rejects local/mismatched
+application consumes the forwarded HTTPS scheme. The container listens on the
+standard `ASPNETCORE_HTTP_PORTS` setting, which the hosting environment can
+override without rebuilding the image. Production startup rejects local/mismatched
 Passkey origins, limits above 3 Passkeys or 100 display-name characters, and
 PostgreSQL connections whose SSL mode is not `Require`, `VerifyCA`, or
 `VerifyFull` before it attempts database migration.

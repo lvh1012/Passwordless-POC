@@ -1,12 +1,47 @@
 using Npgsql;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace PasskeyAuthn.Configuration;
 
 /// <summary>
 /// Validates deployment configuration that must fail closed before PostgreSQL migrations run.
 /// </summary>
-public static class ProductionConfigurationValidator
+public sealed class ProductionConfigurationValidator : IValidateOptions<PasskeySettings>
 {
+    private readonly IConfiguration _configuration;
+
+    /// <summary>
+    /// Initializes the validator with the application's configuration provider.
+    /// </summary>
+    /// <param name="configuration">Configuration containing the default PostgreSQL connection string.</param>
+    public ProductionConfigurationValidator(IConfiguration configuration)
+    {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    }
+
+    /// <summary>
+    /// Validates bound Passkey settings through the standard options pipeline.
+    /// </summary>
+    /// <param name="name">The options instance name.</param>
+    /// <param name="settings">The bound Passkey settings.</param>
+    /// <returns>A success result or a safe failure result identifying the invalid setting.</returns>
+    public ValidateOptionsResult Validate(string? name, PasskeySettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        try
+        {
+            Validate(settings, _configuration.GetConnectionString("Default"));
+            return ValidateOptionsResult.Success;
+        }
+        catch (InvalidOperationException exception)
+        {
+            // Options validation must preserve the existing safe, key-specific error without exposing secrets.
+            return ValidateOptionsResult.Fail(exception.Message);
+        }
+    }
+
     /// <summary>
     /// Rejects unsafe relying-party settings and PostgreSQL connections without including configured values in errors.
     /// </summary>

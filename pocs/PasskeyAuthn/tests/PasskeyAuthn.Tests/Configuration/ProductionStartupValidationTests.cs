@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace PasskeyAuthn.Tests.Configuration;
@@ -18,7 +19,7 @@ public sealed class ProductionStartupValidationTests
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.UseEnvironment("Production"));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        var exception = Assert.Throws<OptionsValidationException>(() => factory.CreateClient());
 
         Assert.Contains("Passkey:ServerDomain", exception.Message, StringComparison.Ordinal);
     }

@@ -1,4 +1,6 @@
 using PasskeyAuthn.Configuration;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace PasskeyAuthn.Tests.Configuration;
@@ -10,6 +12,48 @@ public sealed class ProductionConfigurationValidatorTests
 {
     private const string ValidConnectionString =
         "Host=aws-0-ap-southeast-1.pooler.supabase.com;Database=postgres;Username=app;Password=test-only;SSL Mode=VerifyFull";
+
+    [Fact]
+    /// <summary>
+    /// Verifies production validation participates in the standard options pipeline.
+    /// </summary>
+    public void Options_validator_accepts_valid_production_configuration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = ValidConnectionString,
+            })
+            .Build();
+        var validator = new ProductionConfigurationValidator(configuration);
+
+        var result = validator.Validate(Options.DefaultName, CreateValidSettings());
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    /// <summary>
+    /// Verifies the options pipeline reports an invalid Passkey key without exposing database values.
+    /// </summary>
+    public void Options_validator_reports_invalid_setting_without_secret_values()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = ValidConnectionString,
+            })
+            .Build();
+        var settings = CreateValidSettings();
+        settings.ServerDomain = "https://invalid.example";
+        var validator = new ProductionConfigurationValidator(configuration);
+
+        var result = validator.Validate(Options.DefaultName, settings);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Passkey:ServerDomain", string.Join(" ", result.Failures!), StringComparison.Ordinal);
+        Assert.DoesNotContain("test-only", string.Join(" ", result.Failures!), StringComparison.Ordinal);
+    }
 
     [Fact]
     /// <summary>
