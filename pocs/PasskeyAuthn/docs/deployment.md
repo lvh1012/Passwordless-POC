@@ -97,30 +97,43 @@ needs attention.
 
 ## 5. Manual HTTPS acceptance checklist
 
-Run this checklist only against the deployed
-`https://<service>.onrender.com` hostname in a modern browser with a platform
+Run this checklist only against the deployed HTTPS
+`https://<service>.onrender.com` hostname in a modern browser with a compatible
 authenticator. The real browser and authenticator are required because an
-automated HTTP client cannot prove the WebAuthn cryptographic ceremony.
+automated HTTP client cannot prove the WebAuthn cryptographic ceremony. CDA is
+browser-mediated: the application does not create QR codes, pairing data, or a
+Bluetooth/pairing protocol.
 
-1. Open `/register` and create a platform Passkey.
-2. Confirm the browser redirects to `/dashboard` and displays the expected
+1. On a desktop or laptop, open `/register`, enter an email address, and start
+   registration.
+2. If the browser offers a phone or another device and displays a QR code, scan
+   the browser-provided QR code with the phone and complete registration using
+   the phone's Passkey. Otherwise, complete registration with a compatible
+   authenticator on the desktop/laptop.
+3. Confirm the browser redirects to `/dashboard` and displays the expected
    email address.
-3. Log out from `/dashboard`.
-4. Open `/` and sign in with the same discoverable Passkey; no email input is
-   required.
-5. In a new anonymous browser session, open `/dashboard` and confirm it
+4. Log out from `/dashboard`.
+5. On the desktop or laptop, open `/` and start login with the same
+   discoverable Passkey; no email input is required.
+6. If the browser requests cross-device authentication, use the phone to scan
+   its QR code and complete user verification. Otherwise, use a compatible
+   authenticator available on the desktop/laptop.
+7. Start one registration or login ceremony, then cancel it in the browser or
+   authenticator. Confirm no session is created and the application presents a
+   safe error state. Retry with a compatible Passkey/authenticator or stop;
+   there is no application-managed fallback or device pairing flow.
+8. In a new anonymous browser session, open `/dashboard` and confirm it
    redirects to `/`.
-6. Confirm safe user-facing behavior for a cancelled authenticator, unsupported
-   WebAuthn, duplicate registration, a malformed credential, and an expired
-   challenge.
-7. In Supabase PostgreSQL, confirm that `AspNetUserPasskeys` contains a row whose
+9. Confirm safe user-facing behavior for unsupported WebAuthn, duplicate
+   registration, a malformed credential, and an expired challenge.
+10. In Supabase PostgreSQL, confirm that `AspNetUserPasskeys` contains a row whose
    `UserId` joins to the registered row in `AspNetUsers`. Inspect only the row
    relationship and public credential metadata; never expose credential blobs
    or private key material in screenshots, logs, or documentation.
-8. Restart or redeploy the Render service, wait for `/health`, then log out and
+11. Restart or redeploy the Render service, wait for `/health`, then log out and
    sign in again with the same Passkey. This verifies the PostgreSQL credential
    row and persisted Data Protection keys survive application restart.
-9. Confirm `/health` is healthy both before and after the Render Free service
+12. Confirm `/health` is healthy both before and after the Render Free service
    wakes from an idle period.
 
 Successful cryptographic ceremony and deployment evidence require all of the
@@ -145,6 +158,10 @@ evidence that the deployed flow has passed.
 - Passkeys created before `residentKey = required` may not be discoverable and
   must be re-registered. The POC does not automatically delete or migrate those
   credentials.
+- CDA availability and the QR-based handoff are decided by the browser and
+  authenticator; a browser may offer neither or may require a different
+  compatible device. The application has no custom QR, Bluetooth, pairing, or
+  password fallback protocol.
 - The POC has no password fallback, Passkey management UI, production SLA,
   monitoring, backups, multi-instance scaling, or high-volume rate limiting.
 - It is not a production authentication service; production use would require

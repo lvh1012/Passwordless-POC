@@ -48,6 +48,16 @@
     }
 
     /**
+     * Adds the browser hint that lets WebAuthn offer browser-mediated cross-device authentication.
+     * The browser selects the transport, so this client must not implement a QR or Bluetooth protocol itself.
+     * @param {PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON} options Server-issued JSON options.
+     * @returns {PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON} Options augmented for browser-mediated CDA.
+     */
+    function withHybridHint(options) {
+        return { ...options, hints: ["hybrid"] };
+    }
+
+    /**
      * Parses registration options, using the platform helper when it is available.
      * @param {PublicKeyCredentialCreationOptionsJSON} options Server-issued JSON options.
      * @returns {PublicKeyCredentialCreationOptions} Browser-compatible creation options.
@@ -226,8 +236,8 @@
                 ? await readRegistrationOptions(email)
                 : await readLoginOptions();
             const credential = isRegistration
-                ? await navigator.credentials.create({ publicKey: parseCreationOptions(options) })
-                : await navigator.credentials.get({ publicKey: parseRequestOptions(options) });
+                ? await navigator.credentials.create({ publicKey: parseCreationOptions(withHybridHint(options)) })
+                : await navigator.credentials.get({ publicKey: parseRequestOptions(withHybridHint(options)) });
             if (!credential) {
                 throw new CeremonyError("NotAllowedError");
             }

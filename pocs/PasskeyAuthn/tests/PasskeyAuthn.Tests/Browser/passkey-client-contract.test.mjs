@@ -10,8 +10,11 @@ const scriptPath = new URL("../../../src/PasskeyAuthn/wwwroot/js/passkey.js", im
  * This avoids copying serializer logic into the test and keeps the test dependency-free.
  * @returns {Record<string, Function>} The public Passkey client API.
  */
-function loadPasskeyClient() {
-    const window = {};
+function loadPasskeyClient(browser = {}) {
+    const window = {
+        PublicKeyCredential: class PublicKeyCredential {},
+        location: { assign() {} },
+    };
     const context = vm.createContext({
         ArrayBuffer,
         Uint8Array,
@@ -20,16 +23,45 @@ function loadPasskeyClient() {
         document: {
             addEventListener() {},
             getElementById() { return null; },
-            querySelector() { return null; },
+            querySelector(selector) {
+                return selector === 'meta[name="csrf-token"]' ? { content: "test-csrf-token" } : null;
+            },
             querySelectorAll() { return []; },
         },
-        navigator: { credentials: {} },
-        PublicKeyCredential: class PublicKeyCredential {},
+        fetch: browser.fetch,
+        navigator: { credentials: browser.credentials ?? {} },
+        PublicKeyCredential: window.PublicKeyCredential,
         window,
     });
 
     vm.runInContext(readFileSync(scriptPath, "utf8"), context, { filename: scriptPath.pathname });
     return window.PasskeyAuth;
+}
+
+/**
+ * Supplies the smallest credential shape that lets public ceremony methods reach their WebAuthn boundary.
+ * @returns {object} A serializable registration or assertion credential.
+ */
+function credential() {
+    return {
+        id: "test-credential",
+        rawId: bytes(1),
+        type: "public-key",
+        getClientExtensionResults: () => ({}),
+        response: { clientDataJSON: bytes(2), attestationObject: bytes(3) },
+    };
+}
+
+/**
+ * Returns successful server responses for an options request and its ceremony completion.
+ * @param {object} options WebAuthn JSON options returned by the options endpoint.
+ * @returns {(url: string) => Promise<object>} A minimal browser fetch implementation.
+ */
+function successfulCeremonyFetch(options) {
+    return async url => ({
+        ok: true,
+        json: async () => url.endsWith("/options") ? options : {},
+    });
 }
 
 /**
@@ -106,4 +138,43 @@ test("maps login verification failures to a safe message", () => {
     assert.equal(
         client.mapError({ name: "AuthenticationFailed" }),
         "The passkey could not be verified. Please try again.");
+});
+
+test("startRegistration passes a hybrid hint to WebAuthn creation", async () => {
+    let receivedOptions;
+    const client = loadPasskeyClient({
+        credentials: {
+            create: async ({ publicKey }) => {
+                receivedOptions = publicKey;
+                return credential();
+            },
+        },
+        fetch: successfulCeremonyFetch({
+            challenge: "AQ",
+            rp: { name: "PasskeyAuthn" },
+            user: { id: "Ag", name: "user@example.test", displayName: "Test User" },
+            pubKeyCredParams: [],
+        }),
+    });
+
+    await client.startRegistration("user@example.test");
+
+    assert.deepEqual([...receivedOptions.hints ?? []], ["hybrid"]);
+});
+
+test("startLogin passes a hybrid hint to WebAuthn request", async () => {
+    let receivedOptions;
+    const client = loadPasskeyClient({
+        credentials: {
+            get: async ({ publicKey }) => {
+                receivedOptions = publicKey;
+                return credential();
+            },
+        },
+        fetch: successfulCeremonyFetch({ challenge: "AQ" }),
+    });
+
+    await client.startLogin();
+
+    assert.deepEqual([...receivedOptions.hints ?? []], ["hybrid"]);
 });

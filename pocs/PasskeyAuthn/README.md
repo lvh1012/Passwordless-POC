@@ -40,17 +40,26 @@ pocs/PasskeyAuthn/
 
 1. Mở `/register` và nhập email address.
 2. Browser gọi `navigator.credentials.create()` qua client script.
-3. Server xác thực attestation bằng ASP.NET Core Identity.
-4. Passkey được lưu vào `AspNetUserPasskeys` và user được sign in bằng cookie.
+3. Nếu Passkey không có trên máy đang dùng, browser có thể đề nghị dùng phone hoặc
+   thiết bị khác; khi browser hiển thị QR code, user quét mã và làm theo hướng dẫn
+   của browser.
+4. Server xác thực attestation bằng ASP.NET Core Identity.
+5. Passkey được lưu vào `AspNetUserPasskeys` và user được sign in bằng cookie.
 
 ### Login
 
 1. Mở `/` và bấm `Sign in with passkey`.
 2. Browser gọi `navigator.credentials.get()` để chọn discoverable Passkey.
-3. User hoàn tất user verification bằng platform authenticator.
+3. Nếu cần dùng phone hoặc thiết bị khác, browser có thể hiển thị QR code; user
+   quét mã và hoàn tất user verification theo hướng dẫn của browser.
 4. Server xác thực assertion bằng credential ID và public key đã lưu.
 5. ASP.NET Core Identity tạo authentication cookie.
 6. User được chuyển tới `/dashboard`.
+
+Browser-mediated Cross-Device Authentication (CDA) là capability do browser và
+authenticator cung cấp. Ứng dụng chỉ khởi động WebAuthn ceremony; không tạo QR
+code, không lưu pairing data, và không triển khai Bluetooth hay custom pairing
+protocol.
 
 Các API ceremony chính:
 
@@ -192,6 +201,13 @@ POC này được thiết kế cho Render Free Web Service và Supabase PostgreS
 - Public Passkey endpoints có fixed-window rate limit.
 - Production startup từ chối localhost/mismatched origin và PostgreSQL không bật
   TLS.
+- CDA phụ thuộc browser, OS và authenticator. HTTPS là bắt buộc khi deploy (trừ
+  secure-context `localhost` dành cho development); nếu CDA không được hỗ trợ,
+  user chỉ có thể chọn Passkey/authenticator tương thích khác hoặc hủy ceremony
+  mà không làm thay đổi trạng thái đăng nhập.
+- QR code (nếu có) thuộc browser-mediated CDA. Chỉ quét QR code do browser hiển
+  thị trong WebAuthn ceremony cho đúng HTTPS origin; ứng dụng không tự quản lý
+  QR code hoặc thiết bị ghép đôi.
 - Không log credential JSON, private key material, authentication cookie hoặc
   database connection string.
 - Đây là POC, không phải authentication service production-ready. Cần security
