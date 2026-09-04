@@ -1,0 +1,10 @@
+**/bin
+**/obj
+**/.vs
+**/.vscode
+tests
+docs
+render.yaml
+README.md
+ci.sh
+poc.json

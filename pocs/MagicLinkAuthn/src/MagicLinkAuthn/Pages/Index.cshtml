@@ -1,0 +1,21 @@
+@page "/"
+@inject IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = "Sign in";
+    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<section class="card">
+    <p class="eyebrow">Passwordless authentication</p>
+    <h1>Sign in with a Magic Link</h1>
+    <p>Enter your email. A one-time link will expire after 10 minutes.</p>
+
+    <form id="magic-link-form" data-antiforgery="@requestToken">
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required />
+        <button type="submit">Send secure sign-in link</button>
+    </form>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+</section>
+
+<script src="~/js/magic-link.js" asp-append-version="true"></script>

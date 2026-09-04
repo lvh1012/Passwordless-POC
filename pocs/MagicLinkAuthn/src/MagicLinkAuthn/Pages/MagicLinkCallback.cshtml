@@ -1,0 +1,13 @@
+@page "/magic-link/callback"
+@inject IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = "Preparing sign-in";
+    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<section class="card" id="magic-link-callback" data-antiforgery="@requestToken">
+    <h1>Preparing secure sign-in…</h1>
+    <p id="status" class="status" role="status" aria-live="polite">Checking this Magic Link.</p>
+</section>
+
+<script src="~/js/magic-link-callback.js" asp-append-version="true"></script>

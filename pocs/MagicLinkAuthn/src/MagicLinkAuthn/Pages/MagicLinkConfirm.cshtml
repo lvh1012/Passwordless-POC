@@ -1,0 +1,15 @@
+@page "/magic-link/confirm"
+@inject IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = "Confirm sign-in";
+    var tokens = Antiforgery.GetAndStoreTokens(Context);
+}
+
+<section class="card">
+    <h1>Confirm sign-in</h1>
+    <p>Continue to consume this one-time Magic Link and sign in.</p>
+    <form method="post" action="/api/magic-links/redeem">
+        <input type="hidden" name="@tokens.FormFieldName" value="@tokens.RequestToken" />
+        <button type="submit">Continue</button>
+    </form>
+</section>

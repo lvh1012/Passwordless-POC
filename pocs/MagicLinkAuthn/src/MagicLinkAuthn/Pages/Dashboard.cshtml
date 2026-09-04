@@ -1,0 +1,18 @@
+@page "/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@inject IAntiforgery Antiforgery
+@attribute [Authorize]
+@{
+    ViewData["Title"] = "Dashboard";
+    var tokens = Antiforgery.GetAndStoreTokens(Context);
+}
+
+<section class="card">
+    <p class="eyebrow">Authenticated</p>
+    <h1>Dashboard</h1>
+    <p>Signed in as <strong>@User.Identity?.Name</strong>.</p>
+    <form method="post" action="/api/auth/logout">
+        <input type="hidden" name="@tokens.FormFieldName" value="@tokens.RequestToken" />
+        <button type="submit" class="secondary">Sign out</button>
+    </form>
+</section>
