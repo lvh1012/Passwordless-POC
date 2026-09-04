@@ -2,7 +2,7 @@
 @inject IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Preparing sign-in";
-    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var requestToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
 }
 
 <section class="card" id="magic-link-callback" data-antiforgery="@requestToken">

@@ -179,7 +179,7 @@ public sealed class MagicLinkService
         }
 
         if (returnUrl.Length > 2048 ||
-            !returnUrl.StartsWith('/', StringComparison.Ordinal) ||
+            !returnUrl.StartsWith("/", StringComparison.Ordinal) ||
             returnUrl.StartsWith("//", StringComparison.Ordinal) ||
             returnUrl.StartsWith("/\\", StringComparison.Ordinal) ||
             returnUrl.Contains('\r') ||

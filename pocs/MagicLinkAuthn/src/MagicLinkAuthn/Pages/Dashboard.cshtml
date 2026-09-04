@@ -4,7 +4,7 @@
 @attribute [Authorize]
 @{
     ViewData["Title"] = "Dashboard";
-    var tokens = Antiforgery.GetAndStoreTokens(Context);
+    var tokens = Antiforgery.GetAndStoreTokens(HttpContext);
 }
 
 <section class="card">

@@ -2,7 +2,7 @@
 @inject IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Confirm sign-in";
-    var tokens = Antiforgery.GetAndStoreTokens(Context);
+    var tokens = Antiforgery.GetAndStoreTokens(HttpContext);
 }
 
 <section class="card">

@@ -2,7 +2,7 @@
 @inject IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Sign in";
-    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var requestToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
 }
 
 <section class="card">
