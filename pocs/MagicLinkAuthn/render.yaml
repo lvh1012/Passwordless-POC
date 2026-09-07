@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: magic-link-authn
+    runtime: docker
+    plan: free
+    rootDir: pocs/MagicLinkAuthn
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: MagicLink__PublicBaseUrl
+        sync: false
+      - key: MagicLink__LifetimeMinutes
+        value: 10
+      - key: MagicLink__EmailCooldownSeconds
+        value: 60
+      - key: MagicLink__OutboxEncryptionKey
+        generateValue: true
+      - key: Resend__ApiKey
+        sync: false
+      - key: Resend__From
+        sync: false

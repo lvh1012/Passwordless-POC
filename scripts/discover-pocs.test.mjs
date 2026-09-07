@@ -61,16 +61,24 @@ async function withTemporaryRoot(runTest) {
   }
 }
 
-test('discovers the PasskeyAuthn POC through the real CLI process', () => {
+test('discovers every repository POC through the real CLI process', () => {
   const output = runDiscovery(repositoryRoot);
 
   assert.deepEqual(JSON.parse(output), {
-    include: [{
-      id: 'passkey-authn',
-      path: 'pocs/PasskeyAuthn',
-      ciScript: 'ci.sh',
-      deployHookSecret: 'RENDER_DEPLOY_HOOK_URL_PASSKEY_AUTHN',
-    }],
+    include: [
+      {
+        id: 'magic-link-authn',
+        path: 'pocs/MagicLinkAuthn',
+        ciScript: 'ci.sh',
+        deployHookSecret: 'RENDER_DEPLOY_HOOK_URL_MAGIC_LINK_AUTHN',
+      },
+      {
+        id: 'passkey-authn',
+        path: 'pocs/PasskeyAuthn',
+        ciScript: 'ci.sh',
+        deployHookSecret: 'RENDER_DEPLOY_HOOK_URL_PASSKEY_AUTHN',
+      },
+    ],
   });
 });
 

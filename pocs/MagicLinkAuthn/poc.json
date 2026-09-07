@@ -1,0 +1,4 @@
+{
+  "id": "magic-link-authn",
+  "deployHookSecret": "RENDER_DEPLOY_HOOK_URL_MAGIC_LINK_AUTHN"
+}
