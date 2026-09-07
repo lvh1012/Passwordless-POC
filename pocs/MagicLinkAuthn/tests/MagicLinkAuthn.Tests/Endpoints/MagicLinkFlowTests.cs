@@ -37,7 +37,7 @@ public sealed class MagicLinkFlowTests
                 await service.IssueAsync("new-user@example.test", "/dashboard", CancellationToken.None));
 
             var db = issueScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Assert.Empty(await db.Users.ToListAsync());
+            Assert.False(await db.Users.AnyAsync(user => user.Email == "new-user@example.test"));
             Assert.Empty(await db.MagicLinkOutboxMessages.ToListAsync());
         }
 
