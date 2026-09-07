@@ -13,7 +13,8 @@ public sealed class MagicLinkService
     private readonly ApplicationDbContext _dbContext;
     private readonly ILookupNormalizer _normalizer;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IMagicLinkEmailSender _emailSender;
+    private readonly MagicLinkDeliveryService _deliveryService;
+    private readonly MagicLinkOutboxProtector _outboxProtector;
     private readonly MagicLinkTokenService _tokenService;
     private readonly MagicLinkSettings _settings;
     private readonly TimeProvider _timeProvider;
@@ -22,7 +23,8 @@ public sealed class MagicLinkService
         ApplicationDbContext dbContext,
         ILookupNormalizer normalizer,
         UserManager<ApplicationUser> userManager,
-        IMagicLinkEmailSender emailSender,
+        MagicLinkDeliveryService deliveryService,
+        MagicLinkOutboxProtector outboxProtector,
         MagicLinkTokenService tokenService,
         IOptions<MagicLinkSettings> settings,
         TimeProvider timeProvider)
@@ -30,7 +32,8 @@ public sealed class MagicLinkService
         _dbContext = dbContext;
         _normalizer = normalizer;
         _userManager = userManager;
-        _emailSender = emailSender;
+        _deliveryService = deliveryService;
+        _outboxProtector = outboxProtector;
         _tokenService = tokenService;
         _settings = settings.Value;
         _timeProvider = timeProvider;
@@ -49,8 +52,7 @@ public sealed class MagicLinkService
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        // Serialize issuance per normalized email. Sending inside this short transaction lets a provider failure
-        // roll back the new token without revoking the user's previous valid link.
+        // Serialize issuance per normalized email so request and cooldown decisions remain consistent.
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({normalizedEmail}, 0))",
             cancellationToken);
@@ -77,29 +79,20 @@ public sealed class MagicLinkService
         };
 
         _dbContext.MagicLinkRequests.Add(request);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        var baseUri = new Uri(_settings.PublicBaseUrl, UriKind.Absolute);
-        var callback = new Uri(baseUri, $"/magic-link/callback#token={token.EncodedToken}");
-        var providerMessageId = await _emailSender.SendAsync(email, callback, request.Id, cancellationToken);
-
-        await _dbContext.MagicLinkRequests
-            .Where(candidate =>
-                candidate.NormalizedEmail == normalizedEmail &&
-                candidate.Id != request.Id &&
-                candidate.SentAt != null &&
-                candidate.ConsumedAt == null &&
-                candidate.RevokedAt == null)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(candidate => candidate.RevokedAt, now),
-                cancellationToken);
-
-        request.SentAt = now;
-        request.ProviderMessageId = providerMessageId;
+        _dbContext.MagicLinkOutboxMessages.Add(new MagicLinkOutboxMessage
+        {
+            MagicLinkRequestId = request.Id,
+            ProtectedToken = _outboxProtector.Protect(request.Id, token.EncodedToken),
+            CreatedAt = now,
+            NextAttemptAt = now
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return MagicLinkIssueResult.Sent;
+        var delivery = await _deliveryService.DeliverAsync(request.Id, cancellationToken);
+        return delivery == MagicLinkDeliveryResult.Delivered
+            ? MagicLinkIssueResult.Sent
+            : MagicLinkIssueResult.Queued;
     }
 
     public async Task<MagicLinkRedemption?> RedeemAsync(string? encodedToken, CancellationToken cancellationToken)
@@ -219,6 +212,7 @@ public sealed class MagicLinkService
 public enum MagicLinkIssueResult
 {
     Sent,
+    Queued,
     Throttled
 }
 

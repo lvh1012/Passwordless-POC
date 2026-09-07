@@ -64,6 +64,11 @@ public sealed class ProductionConfigurationValidator :
             throw InvalidSetting("MagicLink:EmailCooldownSeconds", "must be between 10 and 600");
         }
 
+        if (!TryDecodeEncryptionKey(settings.OutboxEncryptionKey, out _))
+        {
+            throw InvalidSetting("MagicLink:OutboxEncryptionKey", "must be a Base64-encoded 256-bit key");
+        }
+
         ValidateConnectionString(connectionString);
     }
 
@@ -106,9 +111,28 @@ public sealed class ProductionConfigurationValidator :
         if (string.IsNullOrWhiteSpace(builder.Host) ||
             string.IsNullOrWhiteSpace(builder.Database) ||
             string.IsNullOrWhiteSpace(builder.Username) ||
-            builder.SslMode is not (SslMode.Require or SslMode.VerifyCA or SslMode.VerifyFull))
+            builder.SslMode is not (SslMode.VerifyCA or SslMode.VerifyFull))
         {
-            throw InvalidSetting("ConnectionStrings:Default", "must include host, database, username, and SSL Mode Require/VerifyCA/VerifyFull");
+            throw InvalidSetting("ConnectionStrings:Default", "must include host, database, username, and SSL Mode VerifyCA/VerifyFull");
+        }
+    }
+
+    internal static bool TryDecodeEncryptionKey(string? encodedKey, out byte[] key)
+    {
+        key = [];
+        if (string.IsNullOrWhiteSpace(encodedKey))
+        {
+            return false;
+        }
+
+        try
+        {
+            key = Convert.FromBase64String(encodedKey);
+            return key.Length == 32;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 

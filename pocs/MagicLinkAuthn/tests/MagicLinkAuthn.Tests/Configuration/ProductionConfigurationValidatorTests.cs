@@ -5,8 +5,9 @@ namespace MagicLinkAuthn.Tests.Configuration;
 
 public sealed class ProductionConfigurationValidatorTests
 {
+    private const string EncryptionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     private const string SecureConnection =
-        "Host=db.example.test;Database=magiclink;Username=app;Password=<test-password>;SSL Mode=Require";
+        "Host=db.example.test;Database=magiclink;Username=app;Password=<test-password>;SSL Mode=VerifyFull";
 
     [Fact]
     public void ValidateMagicLink_AcceptsSecureConfiguration()
@@ -16,7 +17,8 @@ public sealed class ProductionConfigurationValidatorTests
             {
                 PublicBaseUrl = "https://magic-link-authn.onrender.com",
                 LifetimeMinutes = 10,
-                EmailCooldownSeconds = 60
+                EmailCooldownSeconds = 60,
+                OutboxEncryptionKey = EncryptionKey
             },
             SecureConnection);
     }
@@ -30,7 +32,7 @@ public sealed class ProductionConfigurationValidatorTests
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ProductionConfigurationValidator.ValidateMagicLink(
-                new MagicLinkSettings { PublicBaseUrl = value },
+                ValidSettings(value),
                 SecureConnection));
 
         Assert.Contains("MagicLink:PublicBaseUrl", exception.Message, StringComparison.Ordinal);
@@ -41,10 +43,36 @@ public sealed class ProductionConfigurationValidatorTests
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ProductionConfigurationValidator.ValidateMagicLink(
-                new MagicLinkSettings { PublicBaseUrl = "https://example.test" },
+                ValidSettings("https://example.test"),
                 "Host=db.example.test;Database=magiclink;Username=app;SSL Mode=Disable"));
 
         Assert.Contains("ConnectionStrings:Default", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ValidateMagicLink_RejectsTlsWithoutCertificateValidation()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ProductionConfigurationValidator.ValidateMagicLink(
+                ValidSettings("https://example.test"),
+                "Host=db.example.test;Database=magiclink;Username=app;SSL Mode=Require"));
+
+        Assert.Contains("VerifyCA/VerifyFull", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-base64")]
+    [InlineData("c2hvcnQ=")]
+    public void ValidateMagicLink_RejectsInvalidOutboxEncryptionKey(string key)
+    {
+        var settings = ValidSettings("https://example.test");
+        settings.OutboxEncryptionKey = key;
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ProductionConfigurationValidator.ValidateMagicLink(settings, SecureConnection));
+
+        Assert.Contains("MagicLink:OutboxEncryptionKey", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -63,4 +91,12 @@ public sealed class ProductionConfigurationValidatorTests
                 From = "not-an-address"
             }));
     }
+
+    private static MagicLinkSettings ValidSettings(string publicBaseUrl) => new()
+    {
+        PublicBaseUrl = publicBaseUrl,
+        LifetimeMinutes = 10,
+        EmailCooldownSeconds = 60,
+        OutboxEncryptionKey = EncryptionKey
+    };
 }

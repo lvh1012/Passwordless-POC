@@ -1,4 +1,5 @@
 using MagicLinkAuthn.Data;
+using MagicLinkAuthn.Email;
 using MagicLinkAuthn.Security;
 using MagicLinkAuthn.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,15 @@ public sealed class MagicLinkFlowTests
     public async Task IssueAndRedeem_CreatesAccountOnlyAfterRedemption_AndConsumesOnce()
     {
         await using var factory = new MagicLinkWebApplicationFactory(_postgres);
+        var requestWasCommittedBeforeSend = false;
+        factory.EmailSender.BeforeSendAsync = async requestId =>
+        {
+            await using var verificationScope = factory.Services.CreateAsyncScope();
+            var verificationDb = verificationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            requestWasCommittedBeforeSend = await verificationDb.MagicLinkRequests
+                .AsNoTracking()
+                .AnyAsync(request => request.Id == requestId);
+        };
 
         await using (var issueScope = factory.Services.CreateAsyncScope())
         {
@@ -28,7 +38,10 @@ public sealed class MagicLinkFlowTests
 
             var db = issueScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             Assert.Empty(await db.Users.ToListAsync());
+            Assert.Empty(await db.MagicLinkOutboxMessages.ToListAsync());
         }
+
+        Assert.True(requestWasCommittedBeforeSend);
 
         var fragment = factory.EmailSender.Latest!.MagicLink.Fragment.TrimStart('#');
         var token = fragment.Split('=', 2) is ["token", var encodedToken] ? encodedToken : null;
@@ -53,5 +66,55 @@ public sealed class MagicLinkFlowTests
             var service = replayScope.ServiceProvider.GetRequiredService<MagicLinkService>();
             Assert.Null(await service.RedeemAsync(token, CancellationToken.None));
         }
+    }
+
+    [Fact]
+    public async Task ProviderFailure_LeavesEncryptedOutboxJobThatCanBeRetried()
+    {
+        await using var factory = new MagicLinkWebApplicationFactory(_postgres);
+        factory.EmailSender.FailDelivery = true;
+
+        Guid requestId;
+        string token;
+        await using (var issueScope = factory.Services.CreateAsyncScope())
+        {
+            var service = issueScope.ServiceProvider.GetRequiredService<MagicLinkService>();
+            Assert.Equal(
+                MagicLinkIssueResult.Queued,
+                await service.IssueAsync("retry-user@example.test", "/dashboard", CancellationToken.None));
+
+            requestId = factory.EmailSender.Latest!.RequestId;
+            token = new Uri(factory.EmailSender.Latest.MagicLink.AbsoluteUri).Fragment
+                .TrimStart('#')
+                .Split('=', 2)[1];
+
+            var db = issueScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var message = await db.MagicLinkOutboxMessages.AsNoTracking().SingleAsync(
+                candidate => candidate.MagicLinkRequestId == requestId);
+            Assert.DoesNotContain(token, Convert.ToBase64String(message.ProtectedToken), StringComparison.Ordinal);
+            Assert.Null((await db.MagicLinkRequests.FindAsync(requestId))!.SentAt);
+        }
+
+        factory.EmailSender.FailDelivery = false;
+        await using (var retryScope = factory.Services.CreateAsyncScope())
+        {
+            var db = retryScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.MagicLinkOutboxMessages
+                .Where(message => message.MagicLinkRequestId == requestId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(message => message.NextAttemptAt, DateTimeOffset.MinValue));
+
+            var delivery = retryScope.ServiceProvider.GetRequiredService<MagicLinkDeliveryService>();
+            Assert.Equal(
+                MagicLinkDeliveryResult.Delivered,
+                await delivery.DeliverAsync(requestId, CancellationToken.None));
+            Assert.Empty(await db.MagicLinkOutboxMessages.Where(message => message.MagicLinkRequestId == requestId).ToListAsync());
+            Assert.NotNull((await db.MagicLinkRequests.FindAsync(requestId))!.SentAt);
+        }
+
+        await using var redeemScope = factory.Services.CreateAsyncScope();
+        var redemption = await redeemScope.ServiceProvider
+            .GetRequiredService<MagicLinkService>()
+            .RedeemAsync(token, CancellationToken.None);
+        Assert.NotNull(redemption);
     }
 }

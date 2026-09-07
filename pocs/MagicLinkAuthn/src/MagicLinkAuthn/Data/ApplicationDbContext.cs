@@ -13,6 +13,8 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>, I
 
     public DbSet<MagicLinkRequest> MagicLinkRequests => Set<MagicLinkRequest>();
 
+    public DbSet<MagicLinkOutboxMessage> MagicLinkOutboxMessages => Set<MagicLinkOutboxMessage>();
+
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -30,6 +32,17 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>, I
             entity.HasIndex(request => request.TokenHash).IsUnique();
             entity.HasIndex(request => new { request.NormalizedEmail, request.CreatedAt });
             entity.HasIndex(request => request.ExpiresAt);
+        });
+
+        builder.Entity<MagicLinkOutboxMessage>(entity =>
+        {
+            entity.HasKey(message => message.MagicLinkRequestId);
+            entity.Property(message => message.ProtectedToken).HasColumnType("bytea").IsRequired();
+            entity.HasIndex(message => new { message.NextAttemptAt, message.LeaseExpiresAt });
+            entity.HasOne(message => message.MagicLinkRequest)
+                .WithOne()
+                .HasForeignKey<MagicLinkOutboxMessage>(message => message.MagicLinkRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

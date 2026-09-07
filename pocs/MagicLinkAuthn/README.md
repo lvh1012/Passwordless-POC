@@ -7,7 +7,8 @@ Identity, PostgreSQL, Resend và Render.
 
 - Token được tạo bằng `RandomNumberGenerator.GetBytes(32)`: 256-bit entropy từ OS CSPRNG.
 - Token là opaque Base64URL; email hoặc user ID không nằm trong token.
-- PostgreSQL chỉ lưu SHA-256 hash của token, không lưu raw token.
+- `MagicLinkRequests` chỉ lưu SHA-256 hash của token. Transactional outbox lưu payload
+  đã mã hóa AES-256-GCM bằng key tách khỏi database và xóa payload sau delivery thành công.
 - Token hết hạn sau 10 phút, chỉ dùng một lần và token mới revoke token cũ.
 - Redemption dùng conditional database update nên concurrent replay chỉ có một request thắng.
 - Account chỉ được tạo và email chỉ được confirm sau khi link được redeem thành công.
@@ -24,12 +25,13 @@ Identity, PostgreSQL, Resend và Render.
 ## Flow
 
 1. User nhập email tại `/`.
-2. `POST /api/magic-links/request` tạo token và gửi email qua Resend.
-3. Email mở `/magic-link/callback#token=...`; server không nhận fragment trong access log.
-4. Callback client xóa fragment và POST token vào `/api/magic-links/prepare`.
-5. Server chuyển token vào short-lived `HttpOnly` cookie.
-6. User POST `/api/magic-links/redeem` để consume token.
-7. Server tạo hoặc resolve Identity user, confirm email và phát authentication cookie.
+2. `POST /api/magic-links/request` atomically commit token hash và encrypted outbox job.
+3. Outbox delivery gửi email qua Resend sau commit và retry bằng stable idempotency key.
+4. Email mở `/magic-link/callback#token=...`; server không nhận fragment trong access log.
+5. Callback client xóa fragment và POST token vào `/api/magic-links/prepare`.
+6. Server chuyển token vào short-lived `HttpOnly` cookie.
+7. User POST `/api/magic-links/redeem` để consume token.
+8. Server tạo hoặc resolve Identity user, confirm email và phát authentication cookie.
 
 ## API
 
@@ -75,10 +77,11 @@ Integration tests dùng Testcontainers PostgreSQL nên cần Docker daemon.
 
 | Environment variable | Yêu cầu |
 | --- | --- |
-| `ConnectionStrings__Default` | Npgsql connection string với `SSL Mode=Require` trở lên |
+| `ConnectionStrings__Default` | Npgsql connection string với `SSL Mode=VerifyCA` hoặc `VerifyFull` |
 | `MagicLink__PublicBaseUrl` | Exact HTTPS origin, không có path/query/fragment |
 | `MagicLink__LifetimeMinutes` | 1–30, mặc định 10 |
 | `MagicLink__EmailCooldownSeconds` | 10–600, mặc định 60 |
+| `MagicLink__OutboxEncryptionKey` | Base64-encoded 256-bit key; Render Blueprint tự generate |
 | `Resend__ApiKey` | Resend API key bắt đầu bằng `re_` |
 | `Resend__From` | Sender thuộc verified Resend domain |
 

@@ -8,14 +8,28 @@ public sealed class TestMagicLinkEmailSender : IMagicLinkEmailSender
 
     public TestEmail? Latest { get; private set; }
 
-    public Task<string> SendAsync(string recipient, Uri magicLink, Guid requestId, CancellationToken cancellationToken)
+    public bool FailDelivery { get; set; }
+
+    public Func<Guid, Task>? BeforeSendAsync { get; set; }
+
+    public async Task<string> SendAsync(string recipient, Uri magicLink, Guid requestId, CancellationToken cancellationToken)
     {
+        if (BeforeSendAsync is not null)
+        {
+            await BeforeSendAsync(requestId);
+        }
+
         lock (_gate)
         {
             Latest = new TestEmail(recipient, magicLink, requestId);
         }
 
-        return Task.FromResult($"test-{requestId:N}");
+        if (FailDelivery)
+        {
+            throw new EmailDeliveryException("Simulated provider failure.");
+        }
+
+        return $"test-{requestId:N}";
     }
 }
 

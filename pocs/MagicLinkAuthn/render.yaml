@@ -17,6 +17,8 @@ services:
         value: 10
       - key: MagicLink__EmailCooldownSeconds
         value: 60
+      - key: MagicLink__OutboxEncryptionKey
+        generateValue: true
       - key: Resend__ApiKey
         sync: false
       - key: Resend__From

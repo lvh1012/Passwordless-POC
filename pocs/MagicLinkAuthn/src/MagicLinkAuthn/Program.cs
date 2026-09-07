@@ -18,13 +18,17 @@ builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<MagicLinkTokenService>();
+builder.Services.AddSingleton<MagicLinkOutboxProtector>();
+builder.Services.AddScoped<MagicLinkDeliveryService>();
 builder.Services.AddScoped<MagicLinkService>();
 builder.Services.AddScoped<AntiforgeryEndpointFilter>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // Render terminates TLS on proxy addresses that are not stable enough to enumerate.
+    // Render is the trusted ingress: the container port is not publicly reachable. Process only the
+    // nearest hop so client-supplied entries earlier in an X-Forwarded-For chain are never trusted.
+    options.ForwardLimit = 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
@@ -100,6 +104,11 @@ else
         client.BaseAddress = new Uri("https://api.resend.com/");
         client.Timeout = TimeSpan.FromSeconds(10);
     });
+}
+
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddHostedService<MagicLinkOutboxWorker>();
 }
 
 var app = builder.Build();

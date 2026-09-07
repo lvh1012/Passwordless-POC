@@ -7,7 +7,7 @@ Protection keys trong Supabase PostgreSQL, và gửi email qua Resend.
 
 1. Tạo Supabase project và lấy Shared Pooler connection ở session mode.
 2. Chuyển sang Npgsql key/value syntax:
-   `Host=<host>;Port=5432;Database=postgres;Username=<user>;Password=<password>;SSL Mode=Require`.
+   `Host=<host>;Port=5432;Database=postgres;Username=<user>;Password=<password>;SSL Mode=VerifyFull`.
 3. Không commit hoặc paste credential vào source.
 
 Nên dùng database/schema riêng cho POC. Application tự apply EF Core migration khi start.
@@ -31,11 +31,18 @@ Magic Link request ID. Raw API key, token và email link không được log.
    - `MagicLink__PublicBaseUrl=https://<service>.onrender.com`
    - `Resend__ApiKey`
    - `Resend__From`
+   Blueprint tự generate `MagicLink__OutboxEncryptionKey`; không rotate key khi còn pending
+   outbox jobs.
 4. Giữ Auto-Deploy off để CI kiểm soát deployment.
 5. Deploy lần đầu và kiểm tra `/health`.
 
 Production startup fail closed nếu base URL không phải exact HTTPS origin, PostgreSQL
-không bật TLS, token lifetime/cooldown vượt giới hạn, hoặc Resend configuration thiếu.
+không verify TLS certificate, outbox encryption key không đủ 256 bit, token
+lifetime/cooldown vượt giới hạn, hoặc Resend configuration thiếu.
+
+Render là trusted ingress duy nhất: public traffic không thể truy cập trực tiếp container
+port. Forwarded Headers Middleware chỉ xử lý hop gần nhất (`ForwardLimit=1`), nên giá trị
+`X-Forwarded-For` do client chèn trước hop của Render không được dùng làm rate-limit key.
 
 ## 4. GitHub Actions deploy hook
 
@@ -65,7 +72,8 @@ không bật TLS, token lifetime/cooldown vượt giới hạn, hoặc Resend co
 
 - Render Free service có thể sleep và gây cold-start delay.
 - Email delivery phụ thuộc Resend quota, verified domain và suppression state.
-- Transaction giữ per-email PostgreSQL advisory lock trong lúc gọi Resend để không revoke
-  link cũ nếu provider từ chối request. Đây là lựa chọn POC; hệ thống throughput cao nên
-  chuyển sang transactional outbox worker.
+- Transactional outbox commit request trước khi gọi Resend. Worker lease job, retry với cùng
+  idempotency key và chỉ revoke link cũ sau khi provider xác nhận delivery.
+- Outbox token được encrypt bằng AES-256-GCM với key ngoài database và bị xóa ngay sau
+  delivery; database compromise riêng lẻ không làm lộ pending raw token.
 - Chưa có account recovery, admin UI, audit pipeline, multi-region consistency hoặc SLA.

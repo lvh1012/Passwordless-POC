@@ -92,6 +92,29 @@ public sealed class InitialCreate : Migration
             });
 
         migrationBuilder.CreateTable(
+            name: "MagicLinkOutboxMessages",
+            columns: table => new
+            {
+                MagicLinkRequestId = table.Column<Guid>(type: "uuid", nullable: false),
+                ProtectedToken = table.Column<byte[]>(type: "bytea", nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                NextAttemptAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                Attempts = table.Column<int>(type: "integer", nullable: false),
+                LeaseId = table.Column<Guid>(type: "uuid", nullable: true),
+                LeaseExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_MagicLinkOutboxMessages", x => x.MagicLinkRequestId);
+                table.ForeignKey(
+                    "FK_MagicLinkOutboxMessages_MagicLinkRequests_MagicLinkRequestId",
+                    x => x.MagicLinkRequestId,
+                    "MagicLinkRequests",
+                    "Id",
+                    onDelete: ReferentialAction.Cascade);
+            });
+
+        migrationBuilder.CreateTable(
             name: "AspNetUserClaims",
             columns: table => new
             {
@@ -164,6 +187,10 @@ public sealed class InitialCreate : Migration
             "MagicLinkRequests",
             new[] { "NormalizedEmail", "CreatedAt" });
         migrationBuilder.CreateIndex("IX_MagicLinkRequests_TokenHash", "MagicLinkRequests", "TokenHash", unique: true);
+        migrationBuilder.CreateIndex(
+            "IX_MagicLinkOutboxMessages_NextAttemptAt_LeaseExpiresAt",
+            "MagicLinkOutboxMessages",
+            new[] { "NextAttemptAt", "LeaseExpiresAt" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
@@ -174,6 +201,7 @@ public sealed class InitialCreate : Migration
         migrationBuilder.DropTable("AspNetUserRoles");
         migrationBuilder.DropTable("AspNetUserTokens");
         migrationBuilder.DropTable("DataProtectionKeys");
+        migrationBuilder.DropTable("MagicLinkOutboxMessages");
         migrationBuilder.DropTable("MagicLinkRequests");
         migrationBuilder.DropTable("AspNetRoles");
         migrationBuilder.DropTable("AspNetUsers");
