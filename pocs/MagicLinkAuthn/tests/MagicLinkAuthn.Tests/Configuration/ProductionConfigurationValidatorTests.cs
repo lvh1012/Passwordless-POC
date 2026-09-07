@@ -38,26 +38,31 @@ public sealed class ProductionConfigurationValidatorTests
         Assert.Contains("MagicLink:PublicBaseUrl", exception.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void ValidateMagicLink_RejectsPostgresWithoutTls()
+    /// <summary>Prevents accepting modes that permit unencrypted database connections.</summary>
+    [Theory]
+    [InlineData("Disable")]
+    [InlineData("Allow")]
+    [InlineData("Prefer")]
+    public void ValidateMagicLink_RejectsPostgresWithoutRequiredTls(string sslMode)
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ProductionConfigurationValidator.ValidateMagicLink(
                 ValidSettings("https://example.test"),
-                "Host=db.example.test;Database=magiclink;Username=app;SSL Mode=Disable"));
+                $"Host=db.example.test;Database=magiclink;Username=app;SSL Mode={sslMode}"));
 
         Assert.Contains("ConnectionStrings:Default", exception.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void ValidateMagicLink_RejectsTlsWithoutCertificateValidation()
+    /// <summary>Allows required TLS with optional certificate verification for POC deployments.</summary>
+    [Theory]
+    [InlineData("Require")]
+    [InlineData("VerifyCA")]
+    [InlineData("VerifyFull")]
+    public void ValidateMagicLink_AcceptsRequiredTls(string sslMode)
     {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            ProductionConfigurationValidator.ValidateMagicLink(
-                ValidSettings("https://example.test"),
-                "Host=db.example.test;Database=magiclink;Username=app;SSL Mode=Require"));
-
-        Assert.Contains("VerifyCA/VerifyFull", exception.Message, StringComparison.Ordinal);
+        ProductionConfigurationValidator.ValidateMagicLink(
+            ValidSettings("https://example.test"),
+            $"Host=db.example.test;Database=magiclink;Username=app;SSL Mode={sslMode}");
     }
 
     [Theory]

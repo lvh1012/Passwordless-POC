@@ -108,12 +108,13 @@ public sealed class ProductionConfigurationValidator :
             throw InvalidSetting("ConnectionStrings:Default", "must be a valid PostgreSQL connection string with TLS required");
         }
 
+        // Allow encrypted connections without certificate verification for this POC, but never optional TLS.
         if (string.IsNullOrWhiteSpace(builder.Host) ||
             string.IsNullOrWhiteSpace(builder.Database) ||
             string.IsNullOrWhiteSpace(builder.Username) ||
-            builder.SslMode is not (SslMode.VerifyCA or SslMode.VerifyFull))
+            builder.SslMode is not (SslMode.Require or SslMode.VerifyCA or SslMode.VerifyFull))
         {
-            throw InvalidSetting("ConnectionStrings:Default", "must include host, database, username, and SSL Mode VerifyCA/VerifyFull");
+            throw InvalidSetting("ConnectionStrings:Default", "must include host, database, username, and SSL Mode Require/VerifyCA/VerifyFull");
         }
     }
 
