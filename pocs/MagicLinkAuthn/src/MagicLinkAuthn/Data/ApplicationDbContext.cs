@@ -21,6 +21,11 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>, I
     {
         base.OnModelCreating(builder);
 
+        builder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(user => user.FullName).HasMaxLength(100);
+        });
+
         builder.Entity<MagicLinkRequest>(entity =>
         {
             entity.HasKey(request => request.Id);

@@ -1,0 +1,32 @@
+@page "/onboarding"
+@model MagicLinkAuthn.Pages.OnboardingModel
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@{
+    ViewData["Title"] = "Complete your profile";
+}
+
+<section class="card">
+    <p class="eyebrow">First sign-in</p>
+    <h1>Complete your profile</h1>
+    <p>Full name is required. Phone number is optional and will not be verified.</p>
+
+    <form method="post" asp-page="/Onboarding" asp-route-returnUrl="@Model.ReturnUrl">
+        <div asp-validation-summary="ModelOnly" class="validation-error"></div>
+
+        <label asp-for="Input.FullName">Full name</label>
+        <input asp-for="Input.FullName" autocomplete="name" maxlength="100" required />
+        <span asp-validation-for="Input.FullName" class="validation-error"></span>
+
+        <label asp-for="Input.PhoneNumber">Phone number <span class="optional">(optional)</span></label>
+        <input asp-for="Input.PhoneNumber"
+               type="tel"
+               autocomplete="tel"
+               inputmode="tel"
+               maxlength="16"
+               placeholder="+84901234567" />
+        <span asp-validation-for="Input.PhoneNumber" class="validation-error"></span>
+
+        <button type="submit">Continue</button>
+    </form>
+</section>

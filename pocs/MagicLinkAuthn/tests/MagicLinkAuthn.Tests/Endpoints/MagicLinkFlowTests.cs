@@ -1,5 +1,6 @@
 using MagicLinkAuthn.Data;
 using MagicLinkAuthn.Email;
+using MagicLinkAuthn.Endpoints;
 using MagicLinkAuthn.Security;
 using MagicLinkAuthn.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +61,8 @@ public sealed class MagicLinkFlowTests
         var successful = Assert.Single(results, result => result is not null)!;
         Assert.Equal("new-user@example.test", successful.User.Email);
         Assert.True(successful.User.EmailConfirmed);
+        Assert.Null(successful.User.ProfileCompletedAt);
+        Assert.StartsWith("/onboarding?returnUrl=", MagicLinkEndpointExtensions.GetPostRedemptionDestination(successful));
 
         await using (var replayScope = factory.Services.CreateAsyncScope())
         {
@@ -116,5 +119,24 @@ public sealed class MagicLinkFlowTests
             .GetRequiredService<MagicLinkService>()
             .RedeemAsync(token, CancellationToken.None);
         Assert.NotNull(redemption);
+    }
+
+    [Fact]
+    public void CompletedProfile_SkipsOnboardingRedirect()
+    {
+        var user = new ApplicationUser
+        {
+            ProfileCompletedAt = DateTimeOffset.UtcNow
+        };
+        var redemption = new MagicLinkRedemption(user, "/dashboard?tab=security");
+
+        Assert.Equal(
+            "/dashboard?tab=security",
+            MagicLinkEndpointExtensions.GetPostRedemptionDestination(redemption));
+
+        Assert.Equal(
+            "/dashboard",
+            MagicLinkEndpointExtensions.GetPostRedemptionDestination(
+                new MagicLinkRedemption(user, "https://attacker.example")));
     }
 }

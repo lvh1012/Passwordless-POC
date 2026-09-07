@@ -10,7 +10,12 @@ Protection keys trong Supabase PostgreSQL, và gửi email qua Resend.
    `Host=<host>;Port=5432;Database=postgres;Username=<user>;Password=<password>;SSL Mode=VerifyFull`.
 3. Không commit hoặc paste credential vào source.
 
-Nên dùng database/schema riêng cho POC. Application tự apply EF Core migration khi start.
+Phải dùng database/schema riêng cho POC. Application tự apply EF Core migration khi start.
+
+> **Destructive onboarding release:** migration
+> `20260907000000_AddUserOnboardingAndResetData` xóa toàn bộ Identity users, sessions,
+> Data Protection keys, Magic Link requests và outbox jobs đúng một lần. Backup database
+> trước khi merge/deploy nếu cần giữ dữ liệu hiện tại.
 
 ## 2. Resend
 
@@ -37,7 +42,7 @@ Magic Link request ID. Raw API key, token và email link không được log.
 5. Deploy lần đầu và kiểm tra `/health`.
 
 Production startup fail closed nếu base URL không phải exact HTTPS origin, PostgreSQL
-không verify TLS certificate, outbox encryption key không đủ 256 bit, token
+không bật TLS, outbox encryption key không đủ 256 bit, token
 lifetime/cooldown vượt giới hạn, hoặc Resend configuration thiếu.
 
 Render là trusted ingress duy nhất: public traffic không thể truy cập trực tiếp container
@@ -59,14 +64,18 @@ port. Forwarded Headers Middleware chỉ xử lý hop gần nhất (`ForwardLimi
 3. Resend nhận đúng một email và link dùng HTTPS origin chính xác.
 4. Trước redemption, `AspNetUsers` chưa có account tương ứng.
 5. Mở link: address bar được scrub fragment trước khi request prepare được gửi.
-6. Confirmation POST chuyển tới `/dashboard` và hiển thị email đã đăng nhập.
-7. Replay cùng link chuyển tới invalid page.
-8. Link cũ không dùng được sau khi link mới được gửi thành công.
-9. Link quá 10 phút không dùng được.
-10. Anonymous request tới `/dashboard` redirect về `/`.
-11. Invalid external `returnUrl` bị từ chối.
-12. Restart/redeploy vẫn giữ login cookie decryption keys và database state.
-13. Xác nhận application logs không chứa raw token, URL fragment, API key hoặc email body.
+6. Confirmation POST chuyển account chưa có profile tới `/onboarding`.
+7. `FullName` là required; bỏ trống `PhoneNumber` vẫn hoàn tất onboarding.
+8. Nếu nhập `PhoneNumber`, giá trị phải theo E.164 và `PhoneNumberConfirmed` vẫn là `false`.
+9. Trước khi hoàn tất onboarding, `/dashboard` redirect lại `/onboarding`.
+10. Hoàn tất onboarding chuyển tới `/dashboard`; login lần sau bỏ qua onboarding.
+11. Replay cùng link chuyển tới invalid page.
+12. Link cũ không dùng được sau khi link mới được gửi thành công.
+13. Link quá 10 phút không dùng được.
+14. Anonymous request tới `/dashboard` redirect về `/`.
+15. Invalid external `returnUrl` bị từ chối.
+16. Sau destructive migration, các deploy tiếp theo giữ login cookie decryption keys và database state.
+17. Xác nhận application logs không chứa raw token, URL fragment, API key hoặc email body.
 
 ## Operational limitations
 
