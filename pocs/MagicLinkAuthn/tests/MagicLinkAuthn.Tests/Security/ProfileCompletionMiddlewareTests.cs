@@ -28,7 +28,11 @@ public sealed class ProfileCompletionMiddlewareTests
             nextCalled = true;
             return Task.CompletedTask;
         });
-        var context = CreateHttpContext(scope.ServiceProvider, user.Id, "/dashboard", "?tab=security");
+        var context = CreateHttpContext(
+            scope.ServiceProvider,
+            user.Id,
+            "/dashboard",
+            new QueryString("?tab=security"));
 
         await middleware.InvokeAsync(
             context,
