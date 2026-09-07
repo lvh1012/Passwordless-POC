@@ -77,7 +77,7 @@ Integration tests dùng Testcontainers PostgreSQL nên cần Docker daemon.
 
 | Environment variable | Yêu cầu |
 | --- | --- |
-| `ConnectionStrings__Default` | Npgsql connection string với `SSL Mode=VerifyCA` hoặc `VerifyFull` |
+| `ConnectionStrings__Default` | Npgsql connection string với `SSL Mode=Require`, `VerifyCA` hoặc `VerifyFull`; `Require` không xác minh chứng chỉ server |
 | `MagicLink__PublicBaseUrl` | Exact HTTPS origin, không có path/query/fragment |
 | `MagicLink__LifetimeMinutes` | 1–30, mặc định 10 |
 | `MagicLink__EmailCooldownSeconds` | 10–600, mặc định 60 |
