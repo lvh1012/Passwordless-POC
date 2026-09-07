@@ -12,6 +12,8 @@ Identity, PostgreSQL, Resend và Render.
 - Token hết hạn sau 10 phút, chỉ dùng một lần và token mới revoke token cũ.
 - Redemption dùng conditional database update nên concurrent replay chỉ có một request thắng.
 - Account chỉ được tạo và email chỉ được confirm sau khi link được redeem thành công.
+- Mọi account phải hoàn tất onboarding trước khi truy cập application pages. `FullName`
+  là bắt buộc; `PhoneNumber` optional và không được đánh dấu verified.
 - Request response không tiết lộ account state; rate limit áp dụng theo IP và normalized email.
 - Magic Link đặt token trong URL fragment. Fragment không được browser gửi trong HTTP request;
   callback JavaScript xóa fragment trước khi POST token sang endpoint cùng origin.
@@ -32,6 +34,18 @@ Identity, PostgreSQL, Resend và Render.
 6. Server chuyển token vào short-lived `HttpOnly` cookie.
 7. User POST `/api/magic-links/redeem` để consume token.
 8. Server tạo hoặc resolve Identity user, confirm email và phát authentication cookie.
+9. Profile chưa hoàn tất được redirect tới `/onboarding`; middleware chặn application pages.
+10. User nhập `FullName` và optional E.164 `PhoneNumber`, sau đó tiếp tục tới local `returnUrl`.
+
+## One-time database reset
+
+Migration `20260907000000_AddUserOnboardingAndResetData` intentionally xóa toàn bộ state
+của Magic Link POC khi được apply lần đầu: Identity accounts/roles/claims, authentication
+sessions, Data Protection keys, Magic Link requests và pending outbox jobs. Migration giữ
+`__EFMigrationsHistory` để reset không lặp lại ở các lần deploy sau.
+
+Đây là destructive migration đã được chấp thuận cho POC. Không reuse migration này cho
+database chứa workload khác.
 
 ## API
 

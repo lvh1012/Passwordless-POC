@@ -119,12 +119,24 @@ public static class MagicLinkEndpointExtensions
         }
 
         await signInManager.SignInAsync(redemption.User, isPersistent: false);
-        return Results.Redirect(redemption.ReturnUrl);
+        return Results.Redirect(GetPostRedemptionDestination(redemption));
     }
 
     private static async Task<IResult> LogoutAsync(SignInManager<ApplicationUser> signInManager)
     {
         await signInManager.SignOutAsync();
         return Results.Redirect("/");
+    }
+
+    public static string GetPostRedemptionDestination(MagicLinkRedemption redemption)
+    {
+        ArgumentNullException.ThrowIfNull(redemption);
+        var returnUrl = UserProfileService.GetSafeReturnUrl(redemption.ReturnUrl);
+        if (redemption.User.ProfileCompletedAt is not null)
+        {
+            return returnUrl;
+        }
+
+        return $"/onboarding?returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 }

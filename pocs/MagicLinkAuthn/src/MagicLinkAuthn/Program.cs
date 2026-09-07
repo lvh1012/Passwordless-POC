@@ -21,6 +21,7 @@ builder.Services.AddScoped<MagicLinkTokenService>();
 builder.Services.AddSingleton<MagicLinkOutboxProtector>();
 builder.Services.AddScoped<MagicLinkDeliveryService>();
 builder.Services.AddScoped<MagicLinkService>();
+builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<AntiforgeryEndpointFilter>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -145,6 +146,7 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<ProfileCompletionMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 
